@@ -1,1 +1,1 @@
-window.APP_CONFIG = { vapidPublicKey: 'BGpFsM8V2kRL-sPvhLUy0M65K9lorbv0O7rDp7d8eO6vZuhGp3tvm7H1CgslrIQMro9ePNpsvqoGvMqjYDJ8jPI' };
+window.APP_CONFIG = { vapidPublicKey: 'BKw4F82lUhxVm3vqeN-myuP7xayXuXSqEIkH-LNVbs_ij0LotN4npwj7SPaOamt8dIHlrmwEvNFG2p-O69pmWyI' };

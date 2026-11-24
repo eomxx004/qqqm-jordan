@@ -61,10 +61,13 @@ if (open) {
 }
 
 // ── 푸시 발송 ──
-const subs = JSON.parse(process.env.PUSH_SUBSCRIPTIONS || '[]');
+const clean = v => (v || '').replace(/^﻿/, '').trim();
+let subs = [];
+try { subs = [].concat(JSON.parse(clean(process.env.PUSH_SUBSCRIPTIONS) || '[]')); }
+catch (e) { console.error('PUSH_SUBSCRIPTIONS 형식 오류 — 푸시 건너뜀'); }
 if (msgs.length && subs.length && process.env.VAPID_PRIVATE_KEY) {
   const { default: webpush } = await import('web-push');
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'https://github.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'https://github.com', clean(process.env.VAPID_PUBLIC_KEY), clean(process.env.VAPID_PRIVATE_KEY));
   for (const m of msgs) for (const sub of subs) {
     try { await webpush.sendNotification(sub, JSON.stringify(m), { TTL: 6 * 3600 }); }
     catch (e) { console.error('푸시 실패', e.statusCode, e.body); }
