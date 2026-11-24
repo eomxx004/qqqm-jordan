@@ -59,3 +59,4 @@ jobs:
           path: docs
       - id: deploy
         uses: actions/deploy-pages@v4
+        continue-on-error: true   # GitHub 일시 오류 시 다음 실행(15분 후)에 다시 배포됨
