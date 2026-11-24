@@ -12,7 +12,7 @@ export const DEFAULTS = {
   panicCount: 4,       // 최근 1개월 안에 마삼 4회 → 공황
   panicWaitMonths: 2,  // 마지막 마삼 후 2개월 + 1일
   panicWaitDays: 1,
-  panicAllowsOtherExits: false, // 공황 중에도 V자/8일 상승 재진입을 허용할지 (확인 필요)
+  panicAllowsOtherExits: true,  // 공황 대기 중에도 V자 반등/8일 연속 상승이면 전량 매수 (사용자 확정)
 };
 
 const EPS = 1e-9;
