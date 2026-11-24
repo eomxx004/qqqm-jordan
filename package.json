@@ -1,0 +1,12 @@
+{
+  "name": "qqqm-jordan",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "update": "node scripts/update.mjs",
+    "backtest": "node scripts/backtest.mjs"
+  },
+  "dependencies": {
+    "web-push": "^4.0.0"
+  }
+}

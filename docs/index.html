@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>QQQM 조던 룰</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root { --bg:#0e1116; --card:#171b22; --line:#262c36; --text:#e8ecf1; --dim:#8b95a3; --up:#e5484d; --down:#3b82f6; --ok:#30a46c; --warn:#f5a524; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f4f6f8; --card:#fff; --line:#e3e7ec; --text:#14181f; --dim:#5f6b7a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system, "Segoe UI", "Noto Sans KR", sans-serif; padding: env(safe-area-inset-top) 0 40px; }
+  main { max-width: 560px; margin: 0 auto; padding: 12px 14px; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:6px 2px 12px; }
+  header h1 { font-size:18px; margin:0; }
+  .badge { font-size:12px; padding:3px 8px; border-radius:99px; background:var(--line); color:var(--dim); }
+  .badge.open { background:rgba(48,164,108,.15); color:var(--ok); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .card h2 { font-size:13px; color:var(--dim); font-weight:600; margin:0 0 8px; }
+  .action { font-size:22px; font-weight:700; margin:2px 0 6px; }
+  .action.BUY { color:var(--up); } .action.SELL { color:var(--down); }
+  .reason { color:var(--dim); font-size:13px; }
+  .bar { height:10px; border-radius:99px; background:var(--line); overflow:hidden; margin:10px 0 4px; }
+  .bar > i { display:block; height:100%; background:var(--ok); }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat small { display:block; color:var(--dim); font-size:12px; }
+  .stat b { font-size:18px; font-variant-numeric: tabular-nums; }
+  .neg { color:var(--down); } .pos { color:var(--up); }
+  ul.list { list-style:none; margin:0; padding:0; }
+  ul.list li { display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid var(--line); font-size:14px; }
+  ul.list li:first-child { border-top:0; }
+  ul.list li span:last-child { text-align:right; font-variant-numeric: tabular-nums; }
+  table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric: tabular-nums; }
+  th, td { padding:6px 4px; text-align:right; border-top:1px solid var(--line); }
+  th { color:var(--dim); font-weight:600; border-top:0; }
+  th:first-child, td:first-child { text-align:left; }
+  tr.here td { background:rgba(245,165,36,.15); font-weight:700; }
+  .prov { border-color: var(--warn); }
+  .prov h2 { color: var(--warn); }
+  label { display:block; font-size:13px; color:var(--dim); margin-bottom:4px; }
+  input[type=number] { width:100%; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:16px; }
+  button { width:100%; padding:12px; border:0; border-radius:10px; background:var(--ok); color:#fff; font-size:15px; font-weight:600; margin-top:8px; }
+  button.ghost { background:var(--line); color:var(--text); }
+  textarea { width:100%; height:90px; font-size:11px; border-radius:8px; background:var(--bg); color:var(--dim); border:1px solid var(--line); }
+  .hist { font-size:13px; }
+  .hist li { display:block !important; }
+  .hist .d { color:var(--dim); }
+  .check { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; }
+  .check input { width:20px; height:20px; }
+  .hidden { display:none; }
+  .msg b { display:block; } .msg pre { white-space:pre-wrap; margin:2px 0 0; font:inherit; color:var(--dim); font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>QQQM 조던 룰</h1>
+    <span id="market" class="badge">불러오는 중…</span>
+  </header>
+
+  <section class="card" id="today">
+    <h2 id="todayTitle">오늘 할 일</h2>
+    <div class="action" id="todayAction">—</div>
+    <div class="reason" id="todayReason"></div>
+    <div class="bar"><i id="stockBar" style="width:0"></i></div>
+    <div class="reason" id="stockText"></div>
+    <label class="check hidden" id="doneWrap"><input type="checkbox" id="done"> 실행 완료</label>
+  </section>
+
+  <section class="card prov hidden" id="provCard">
+    <h2>⏰ 장중 · 지금 가격으로 마감하면</h2>
+    <div class="action" id="provAction"></div>
+    <div class="reason" id="provReason"></div>
+  </section>
+
+  <section class="card">
+    <div class="grid">
+      <div class="stat"><small id="priceLabel">QQQM</small><b id="price">—</b></div>
+      <div class="stat"><small>전고점 대비</small><b id="dd">—</b></div>
+      <div class="stat"><small>나스닥 종합 일간</small><b id="ixic">—</b></div>
+      <div class="stat"><small id="athLabel">전고점</small><b id="ath">—</b></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>다음 신호</h2>
+    <ul class="list" id="triggers"></ul>
+  </section>
+
+  <section class="card">
+    <h2>내 계좌 → 몇 주 사고팔지</h2>
+    <div class="grid">
+      <div><label>보유 QQQM (주)</label><input type="number" id="shares" inputmode="decimal" min="0" step="any"></div>
+      <div><label>현금 ($)</label><input type="number" id="cash" inputmode="decimal" min="0" step="any"></div>
+    </div>
+    <ul class="list" id="account" style="margin-top:10px"></ul>
+  </section>
+
+  <section class="card">
+    <h2>구간표 (전고점 <span id="tableAth"></span> 기준 · 자동 갱신)</h2>
+    <table>
+      <thead><tr><th>하락률</th><th>가격</th><th>1단계 주식</th><th>말뚝박기 주식</th></tr></thead>
+      <tbody id="table"></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>알림 기록</h2>
+    <ul class="list hist" id="messages"></ul>
+  </section>
+
+  <section class="card">
+    <h2>신호 기록</h2>
+    <ul class="list hist" id="history"></ul>
+  </section>
+
+  <section class="card">
+    <h2>푸시 알림 설정</h2>
+    <div class="reason">앱을 홈 화면에 설치한 뒤 알림을 켜세요. 켜면 나오는 코드를 복사해서 전달하면 서버에 등록됩니다.</div>
+    <button id="pushBtn">알림 켜기</button>
+    <button id="testBtn" class="ghost">테스트 알림</button>
+    <div id="subWrap" class="hidden">
+      <label style="margin-top:10px">알림 등록 코드</label>
+      <textarea id="subJson" readonly></textarea>
+      <button id="copyBtn" class="ghost">코드 복사</button>
+    </div>
+  </section>
+
+  <div class="reason" style="text-align:center" id="updated"></div>
+</main>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
