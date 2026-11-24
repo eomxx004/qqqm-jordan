@@ -1,12 +1,12 @@
 {
- "updatedAt": "2026-11-24T20:45:02.016Z",
- "market": "open",
+ "updatedAt": "2026-11-24T21:40:11.621Z",
+ "market": "closed",
  "live": {
   "date": "2026-11-24",
-  "close": 261.71,
-  "ixic": 23634.107,
-  "ixicChg": -1.890667727162354,
-  "dd": 16.322422359521184,
+  "close": 262.78,
+  "ixic": 23733.535,
+  "ixicChg": -1.477924622917981,
+  "dd": 15.980307010182942,
   "mode": "STAKE",
   "stock": 30,
   "delta": 0,
@@ -15,11 +15,11 @@
  },
  "confirmed": {
   "signal": {
-   "date": "2026-11-23",
-   "close": 267.9700012207031,
-   "ixic": 24089.560546875,
-   "ixicChg": 6.507417179449404,
-   "dd": 14.320887308606512,
+   "date": "2026-11-24",
+   "close": 262.78,
+   "ixic": 23733.535,
+   "ixicChg": -1.477924622917981,
+   "dd": 15.980307010182942,
    "mode": "STAKE",
    "stock": 30,
    "delta": 0,
@@ -29,8 +29,8 @@
   "triggers": {
    "ath": 312.760009765625,
    "athDate": "2026-10-06",
-   "mamsamIxic": 23366.87373046875,
-   "upStreak": 1,
+   "mamsamIxic": 23021.52895,
+   "upStreak": 0,
    "upStreakNeed": 8,
    "panic": false,
    "panicUntil": null,
@@ -63,39 +63,7 @@
    }
   }
  },
- "provisional": {
-  "signal": {
-   "date": "2026-11-24",
-   "close": 261.71,
-   "ixic": 23634.107,
-   "ixicChg": -1.890667727162354,
-   "dd": 16.322422359521184,
-   "mode": "STAKE",
-   "stock": 30,
-   "delta": 0,
-   "action": "HOLD",
-   "reasons": []
-  },
-  "triggers": {
-   "ath": 312.760009765625,
-   "athDate": "2026-10-06",
-   "mamsamIxic": 22925.08379,
-   "upStreak": 0,
-   "upStreakNeed": 8,
-   "panic": false,
-   "panicUntil": null,
-   "recentMamsam": 2,
-   "nextBuy": {
-    "pct": 20,
-    "price": 250.2080078125,
-    "stockAfter": 40
-   },
-   "vPrice": {
-    "pct": 5,
-    "price": 297.12200927734375
-   }
-  }
- },
+ "provisional": null,
  "table": [
   {
    "pct": 0,
@@ -1070,6 +1038,12 @@
   }
  ],
  "messages": [
+  {
+   "tag": "daily",
+   "title": "📊 11-24 QQQM $250.21 매수 걸기",
+   "body": "종가 $262.78 (전고점 대비 -16.0%) · 나스닥 -1.48%\n👉 다음 구간 $250.21 (-20%)에 주식 10%p 지정가 매수 걸어두기 → 주식 40%\nV자 반등 전량매수: 종가 $297.12 이상",
+   "at": "2026-11-24T21:40:11.621Z"
+  },
   {
    "tag": "test",
    "title": "✅ 푸시 연결 완료",
