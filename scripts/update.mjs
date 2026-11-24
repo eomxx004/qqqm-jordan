@@ -70,7 +70,8 @@ let subs = [];
 try { subs = [].concat(JSON.parse(clean(process.env.PUSH_SUBSCRIPTIONS) || '[]')); }
 catch (e) { console.error('PUSH_SUBSCRIPTIONS 형식 오류 — 푸시 건너뜀'); }
 if (msgs.length && subs.length && process.env.VAPID_PRIVATE_KEY) {
-  const { default: webpush } = await import('web-push');
+  const wp = await import('web-push');
+  const webpush = wp.default ?? wp;
   webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'https://github.com', clean(process.env.VAPID_PUBLIC_KEY), clean(process.env.VAPID_PRIVATE_KEY));
   for (const m of msgs) for (const sub of subs) {
     try { await webpush.sendNotification(sub, JSON.stringify(m), { TTL: 6 * 3600 }); }
