@@ -60,6 +60,10 @@ if (open) {
   notified.alerts = { [today]: [...sent] };
 }
 
+if (process.env.TEST_PUSH === 'true') {
+  msgs.push({ tag: 'test', title: '✅ 푸시 연결 완료', body: `QQQM ${usd(live.close)} (전고점 대비 -${live.dd.toFixed(1)}%) · 현재 ${conf.state.mode === 'STAKE' ? '2단계 말뚝박기' : conf.state.mode === 'REBAL' ? '1단계 현금화' : '평상시'}, 목표 주식 ${conf.state.stock}%` });
+}
+
 // ── 푸시 발송 ──
 const clean = v => (v || '').replace(/^﻿/, '').trim();
 let subs = [];

@@ -7,6 +7,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      test:
+        description: '테스트 푸시 보내기'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -35,6 +40,7 @@ jobs:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: https://${{ github.repository_owner }}.github.io/
           PUSH_SUBSCRIPTIONS: ${{ secrets.PUSH_SUBSCRIPTIONS }}
+          TEST_PUSH: ${{ inputs.test }}
       - name: 데이터 저장
         run: |
           git config user.name "github-actions[bot]"
