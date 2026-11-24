@@ -36,6 +36,7 @@ export function initialState() {
     maxDD: 0,              // 이번 국면의 최대 하락률 % (종가)
     upStreak: 0,
     mamsamDates: [],
+    lastMamsam: null,      // 가장 최근 마삼 { date, chg }
     panic: false, panicUntil: null,
     lastIxic: null,
   };
@@ -64,6 +65,7 @@ export function step(prev, bar, cfg = DEFAULTS) {
 
   if (isMamsam) {
     s.mamsamDates.push(bar.date);
+    s.lastMamsam = { date: bar.date, chg: ixicChg };
     const monthAgo = addMonthsDays(bar.date, -1, 0);
     s.mamsamDates = s.mamsamDates.filter(d => d > monthAgo);
     if (s.mamsamDates.length >= cfg.panicCount) {

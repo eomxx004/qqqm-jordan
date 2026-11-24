@@ -32,15 +32,22 @@ const nextLines = t => [
 const notified = readJson('notified.json', { daily: null, alerts: {} });
 const msgs = [];
 
+// 할 일이 없을 때: 바로 밑 구간에 걸어둘 주문
+const nextOrder = t => t.nextBuy ? { side: '매수', how: '지정가 매수', ...t.nextBuy }
+  : t.nextSell ? { side: '매도', how: '감시(스탑) 매도', ...t.nextSell } : null;
+
 if (!open && notified.daily !== lastConf.date) {
+  const o = nextOrder(conf.triggers);
+  const hold = lastConf.action === 'HOLD';
   msgs.push({
     tag: 'daily',
-    title: `📊 ${lastConf.date.slice(5)} QQQM ${lastConf.action === 'HOLD' ? '할 일 없음' : lastConf.action === 'BUY' ? '매수 신호' : '매도 신호'}`,
+    title: `📊 ${lastConf.date.slice(5)} QQQM ${!hold ? (lastConf.action === 'BUY' ? '매수 신호' : '매도 신호') : o ? `${usd(o.price)} ${o.side} 걸기` : '보유 유지'}`,
     body: [
       `종가 ${usd(lastConf.close)} (전고점 대비 -${lastConf.dd.toFixed(1)}%) · 나스닥 ${sgn(lastConf.ixicChg)}`,
-      `👉 ${actionText(lastConf)}`,
+      hold && o ? `👉 다음 구간 ${usd(o.price)} (-${o.pct}%)에 주식 10%p ${o.how} 걸어두기 → 주식 ${o.stockAfter}%`
+        : `👉 ${actionText(lastConf)}`,
       ...lastConf.reasons,
-      ...nextLines(conf.triggers),
+      ...nextLines(conf.triggers).filter(l => !(hold && o && l.startsWith('다음'))),
     ].join('\n'),
   });
   notified.daily = lastConf.date;
@@ -91,7 +98,7 @@ writeJson('latest.json', {
   market: open ? 'open' : 'closed',
   live,
   confirmed: { signal: lastConf, triggers: conf.triggers,
-    state: { mode: s.mode, stock: s.stock, ath: s.ath, athDate: s.athDate, maxDD: s.maxDD, panic: s.panic, panicUntil: s.panicUntil, mamsamDates: s.mamsamDates } },
+    state: { mode: s.mode, stock: s.stock, ath: s.ath, athDate: s.athDate, maxDD: s.maxDD, panic: s.panic, panicUntil: s.panicUntil, mamsamDates: s.mamsamDates, lastMamsam: s.lastMamsam } },
   provisional: prov,
   table: zoneTable(s.ath),
   history: conf.signals.filter(x => x.reasons.length).slice(-60).reverse(),

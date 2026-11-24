@@ -23,10 +23,16 @@ function render() {
   $('#market').textContent = open ? '미국장 진행 중' : '장 마감';
   $('#market').className = 'badge' + (open ? ' open' : '');
 
+  // 마지막 마삼
+  const lm = st.lastMamsam;
+  if (lm) {
+    const days = Math.round((Date.parse(new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })) - Date.parse(lm.date)) / 864e5);
+    $('#mamsam').innerHTML = `마지막 마삼 (나스닥 -3%): <b>${lm.date}</b> · 나스닥 ${sgn(lm.chg)} · ${days === 0 ? '오늘' : days + '일 전'}`;
+  } else $('#mamsam').textContent = '마지막 마삼: 기록 없음';
+
   // 오늘 할 일 (확정 종가 기준)
   $('#todayTitle').textContent = `${sig.date} 종가 기준 · ${MODE[st.mode]}${st.panic ? ' · 공황 대기' : ''}`;
-  $('#todayAction').textContent = actionText(sig);
-  $('#todayAction').className = 'action ' + sig.action;
+  renderOrder();
   $('#todayReason').textContent = sig.reasons.join(' · ') || '조건 변화 없음';
   $('#stockBar').style.width = st.stock + '%';
   $('#stockText').textContent = `목표 비중: 주식 ${st.stock}% / 현금 ${100 - st.stock}%`;
@@ -84,8 +90,36 @@ function render() {
   renderAccount();
 }
 
+// 할 일이 없으면 바로 밑 구간에 걸어둘 주문을 보여준다 (주문 1건 = 총자산의 10%)
+function renderOrder() {
+  const sig = data.confirmed.signal, t = data.confirmed.triggers;
+  const o = t.nextBuy ? { side: '매수', how: '지정가 매수', ...t.nextBuy } : t.nextSell ? { side: '매도', how: '감시(스탑) 매도', ...t.nextSell } : null;
+  const shares = +$('#shares').value || 0, cash = +$('#cash').value || 0;
+  const total = shares * data.live.close + cash;
+  let qty = null;
+  if (o && total > 0) {
+    qty = Math.round(total * 0.1 / o.price);
+    qty = o.side === '매수' ? Math.min(qty, Math.floor(cash / o.price)) : Math.min(qty, Math.floor(shares));
+  }
+  const orderLine = o && (qty != null ? `<b>${usd(o.price)}에 ${qty}주 ${o.side}</b> 걸어두세요`
+    : `<b>${usd(o.price)}에 주식 10%p ${o.side}</b> 걸어두세요 <span class="reason">(내 계좌를 입력하면 주수가 나와요)</span>`);
+  const detail = o && `<div class="reason">다음 구간 -${o.pct}% · ${o.how} · 체결되면 주식 ${o.stockAfter}%</div>`;
+
+  if (sig.action === 'HOLD' && o) {
+    $('#todayAction').innerHTML = orderLine;
+    $('#todayAction').className = 'action ' + (o.side === '매수' ? 'BUY' : 'SELL');
+    $('#order').innerHTML = detail;
+  } else {
+    $('#todayAction').textContent = sig.action === 'HOLD' ? '보유 유지' : actionText(sig);
+    $('#todayAction').className = 'action ' + sig.action;
+    $('#order').innerHTML = o ? `다음 주문: ${orderLine}${detail}` : '';
+  }
+  $('#order').classList.toggle('hidden', !o);
+}
+
 function renderAccount() {
   if (!data) return;
+  renderOrder();
   const shares = +$('#shares').value || 0, cash = +$('#cash').value || 0;
   localStorage.setItem('acct', JSON.stringify({ shares, cash }));
   const price = data.live.close, total = shares * price + cash;
