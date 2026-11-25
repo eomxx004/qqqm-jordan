@@ -42,21 +42,50 @@ export function initialState() {
   };
 }
 
-// 하루치 종가를 넣어 상태를 갱신하고 그날의 신호를 돌려준다.
-// bar = { date:'YYYY-MM-DD', close: QQQM 종가, ixic: 나스닥 종합 종가 }
+// 하루치 시세를 넣어 상태를 갱신하고 그날의 신호를 돌려준다.
+// bar = { date:'YYYY-MM-DD', close: QQQM 종가, low: QQQM 장중 저가, ixic: 나스닥 종합 종가 }
+// 하루 순서: ① 장중 — 걸어둔 리밸런싱/말뚝박기 주문 체결(저가가 구간 가격에 닿으면)
+//            ② 종가 — 전고점 돌파, 마삼(나스닥 종가 -3%), V자/8일 상승/공황 종료 재진입
 export function step(prev, bar, cfg = DEFAULTS) {
   const s = { ...prev, mamsamDates: [...prev.mamsamDates] };
   const before = s.stock;
-  const reasons = [];
+  const reasons = [], trades = [];
+  const trade = (to, price, why) => {
+    if (to !== s.stock) trades.push({ from: s.stock, to, price, why });
+    s.stock = to; reasons.push(why);
+  };
 
   const ixicChg = s.lastIxic ? (bar.ixic / s.lastIxic - 1) * 100 : 0;
+  const isMamsam = prev.lastIxic !== null && ixicChg <= cfg.mamsam + EPS;
   s.upStreak = ixicChg > 0 ? s.upStreak + 1 : 0;
   s.lastIxic = bar.ixic;
-  const isMamsam = s.lastIxic !== null && ixicChg <= cfg.mamsam + EPS && prev.lastIxic !== null;
 
-  // 전고점 갱신 → 전량 매수 + 모든 구간 재계산
+  // ① 장중 체결: 저가 기준으로 새로 닿은 구간마다 10%p씩
+  if (s.ath > 0) {
+    const low = Math.min(bar.low ?? bar.close, bar.close);
+    const lowDD = (s.ath - low) / s.ath * 100;
+    if (lowDD > s.maxDD) {
+      const from = s.maxDD; s.maxDD = lowDD;
+      if (s.mode === 'STAKE') {
+        const st = cfg.stakeStep;
+        for (let z = zoneOf(from, st) + 1; z <= zoneOf(lowDD, st); z++) {
+          const t = Math.min(100, cfg.stakeUnit * z);
+          if (t > s.stock) trade(t, priceAt(s.ath, z * st), `말뚝박기 -${z * st}% 도달 → 주식 ${t}%`);
+        }
+      } else {
+        const st = cfg.rebalStep;
+        for (let z = zoneOf(from, st) + 1; z <= zoneOf(lowDD, st); z++) {
+          const t = Math.max(0, 100 - cfg.rebalUnit * (z - s.anchorZone));
+          if (t < s.stock) trade(t, priceAt(s.ath, z * st), `현금화 -${(z * st).toFixed(1)}% 도달 → 주식 ${t}%`);
+        }
+        s.mode = s.stock < 100 ? 'REBAL' : 'HOLD';
+      }
+    }
+  }
+
+  // ② 종가: 전고점 갱신 → 전량 매수 + 모든 구간 재계산
   if (bar.close > s.ath) {
-    if (s.stock < 100) reasons.push('전고점 돌파 → 전량 매수');
+    if (s.stock < 100) trade(100, bar.close, '전고점 돌파 → 전량 매수');
     s.ath = bar.close; s.athDate = bar.date;
     s.mode = 'HOLD'; s.stock = 100; s.anchorZone = 0; s.maxDD = 0;
     s.panic = false; s.panicUntil = null;
@@ -77,8 +106,8 @@ export function step(prev, bar, cfg = DEFAULTS) {
     if (s.mode !== 'STAKE') {
       s.mode = 'STAKE';
       s.maxDD = dd;
-      s.stock = Math.min(100, cfg.stakeUnit * zoneOf(dd, cfg.stakeStep));
-      reasons.push(`마삼 발생 (나스닥 ${ixicChg.toFixed(2)}%) → 말뚝박기 전환, 표 기준 주식 ${s.stock}%`);
+      const t = Math.min(100, cfg.stakeUnit * zoneOf(dd, cfg.stakeStep));
+      trade(t, bar.close, `마삼 발생 (나스닥 ${ixicChg.toFixed(2)}%) → 말뚝박기 전환, 표 기준 주식 ${t}%`);
     } else {
       reasons.push(`말뚝박기 중 마삼 (나스닥 ${ixicChg.toFixed(2)}%) → 매도 없음`);
     }
@@ -95,25 +124,10 @@ export function step(prev, bar, cfg = DEFAULTS) {
     else if (exitsOk && s.upStreak >= cfg.upStreak) why = `나스닥 ${s.upStreak}거래일 연속 상승`;
     else if (exitsOk && lowZone >= cfg.vZones && dd <= vTarget + EPS) why = `V자 반등 (최저 -${(lowZone * gridStep).toFixed(1)}% 구간 → -${vTarget.toFixed(1)}% 회복)`;
     if (why) {
-      reasons.push(`${why} → 전량 매수`);
-      s.mode = 'HOLD'; s.stock = 100;
+      trade(100, bar.close, `${why} → 전량 매수`);
+      s.mode = 'HOLD';
       s.anchorZone = zoneOf(dd, cfg.rebalStep); s.maxDD = dd;
       s.panic = false; s.panicUntil = null;
-    }
-  }
-
-  // 하락 구간 처리
-  // 말뚝박기는 마삼 당일에도 계속 (새 저점이면 매수)
-  if ((!isMamsam || s.mode === 'STAKE') && reasons.every(r => !r.includes('전량 매수'))) {
-    s.maxDD = Math.max(s.maxDD, dd);
-    if (s.mode === 'STAKE') {
-      const t = Math.min(100, cfg.stakeUnit * zoneOf(s.maxDD, cfg.stakeStep));
-      if (t > s.stock) { reasons.push(`말뚝박기: 전고점 대비 -${(zoneOf(s.maxDD, cfg.stakeStep) * cfg.stakeStep)}% 도달`); s.stock = t; }
-    } else {
-      const z = zoneOf(s.maxDD, cfg.rebalStep);
-      const t = Math.max(0, 100 - cfg.rebalUnit * (z - s.anchorZone));
-      if (t < s.stock) { reasons.push(`현금화 리밸런싱: 전고점 대비 -${(z * cfg.rebalStep).toFixed(1)}% 도달`); s.stock = t; }
-      s.mode = s.stock < 100 ? 'REBAL' : 'HOLD';
     }
   }
 
@@ -121,10 +135,10 @@ export function step(prev, bar, cfg = DEFAULTS) {
   return {
     state: s,
     signal: {
-      date: bar.date, close: bar.close, ixic: bar.ixic, ixicChg, dd,
+      date: bar.date, close: bar.close, low: bar.low, ixic: bar.ixic, ixicChg, dd,
       mode: s.mode, stock: s.stock, delta,
       action: delta > 0 ? 'BUY' : delta < 0 ? 'SELL' : 'HOLD',
-      reasons,
+      reasons, trades,
     },
   };
 }

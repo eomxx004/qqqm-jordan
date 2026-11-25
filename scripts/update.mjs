@@ -24,8 +24,8 @@ const sgn = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 const actionText = s => s.action === 'BUY' ? `주식 ${s.delta}%p 매수 → 목표 주식 ${s.stock}%`
   : s.action === 'SELL' ? `주식 ${-s.delta}%p 매도 → 목표 주식 ${s.stock}%` : `할 일 없음 (목표 주식 ${s.stock}%)`;
 const nextLines = t => [
-  t.nextBuy && `다음 매수: 종가 ${usd(t.nextBuy.price)} 이하 (-${t.nextBuy.pct}%) → 주식 ${t.nextBuy.stockAfter}%`,
-  t.nextSell && `다음 매도: 종가 ${usd(t.nextSell.price)} 이하 (-${t.nextSell.pct}%) → 주식 ${t.nextSell.stockAfter}%`,
+  t.nextBuy && `다음 매수: 장중 ${usd(t.nextBuy.price)} 도달 (-${t.nextBuy.pct}%) → 주식 ${t.nextBuy.stockAfter}%`,
+  t.nextSell && `다음 매도: 장중 ${usd(t.nextSell.price)} 도달 (-${t.nextSell.pct}%) → 주식 ${t.nextSell.stockAfter}%`,
   t.vPrice && `V자 반등 전량매수: 종가 ${usd(t.vPrice.price)} 이상`,
 ].filter(Boolean);
 
@@ -59,7 +59,7 @@ if (open) {
   const alert = (key, title, body) => { if (!sent.has(key)) { sent.add(key); msgs.push({ tag: key, title, body }); } };
   if (live.ixicChg <= DEFAULTS.mamsam) alert('mamsam', '🚨 나스닥 -3% 돌파 (마삼 예상)', `나스닥 ${sgn(live.ixicChg)} · 이대로 마감하면: ${actionText(prov.signal)}`);
   else if (live.ixicChg <= DEFAULTS.mamsam + 0.5) alert('mamsam-near', '⚠️ 나스닥 -2.5% 이하', `나스닥 ${sgn(live.ixicChg)} · 마삼(-3%) 근접`);
-  if (prov.signal.action !== 'HOLD') alert(`prov-${prov.signal.stock}`, `⏰ 이대로 마감하면 ${prov.signal.action === 'BUY' ? '매수' : '매도'}`, `QQQM ${usd(live.close)} · ${actionText(prov.signal)}\n${prov.signal.reasons.join('\n')}`);
+  if (prov.signal.action !== 'HOLD') alert(`prov-${prov.signal.stock}`, `⏰ 장중 신호: ${prov.signal.action === 'BUY' ? '매수' : '매도'}`, `QQQM ${usd(live.close)} · ${actionText(prov.signal)}\n${prov.signal.reasons.join('\n')}`);
   const t = conf.triggers;
   for (const [k, p, label] of [['near-buy', t.nextBuy?.price, '다음 매수가'], ['near-sell', t.nextSell?.price, '다음 매도가'], ['near-v', t.vPrice?.price, 'V자 반등가'], ['near-ath', t.ath, '전고점']]) {
     if (p && Math.abs(live.close / p - 1) <= 0.01) alert(k, `🎯 ${label} 1% 이내`, `QQQM ${usd(live.close)} · ${label} ${usd(p)}`);

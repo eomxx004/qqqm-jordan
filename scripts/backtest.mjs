@@ -11,10 +11,10 @@ let shares = 0, cash = 10000, peak = 0, mdd = 0;
 const bh = 10000 / bars[0].close;
 let bhPeak = 0, bhMdd = 0;
 for (const s of signals) {
-  const value = shares * s.close + cash;
-  if (s.action !== 'HOLD' || shares === 0 && s.stock > 0) {
-    const want = value * s.stock / 100 / s.close;
-    cash -= (want - shares) * s.close; shares = want;
+  if (shares === 0 && cash === 10000 && s.stock > 0) { shares = cash * s.stock / 100 / s.close; cash -= shares * s.close; }
+  for (const t of s.trades) { // 구간 가격(장중) 또는 종가에 체결
+    const value = shares * t.price + cash, want = value * t.to / 100 / t.price;
+    cash -= (want - shares) * t.price; shares = want;
   }
   const v = shares * s.close + cash;
   peak = Math.max(peak, v); mdd = Math.min(mdd, v / peak - 1);

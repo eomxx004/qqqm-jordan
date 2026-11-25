@@ -62,8 +62,8 @@ function render() {
   // 다음 신호
   const t = c.triggers, li = (a, b) => `<li><span>${a}</span><span>${b}</span></li>`;
   $('#triggers').innerHTML = [
-    t.nextBuy && li(`말뚝박기 매수 (-${t.nextBuy.pct}%)`, `종가 ≤ ${usd(t.nextBuy.price)} → 주식 ${t.nextBuy.stockAfter}%`),
-    t.nextSell && li(`현금화 매도 (-${t.nextSell.pct}%)`, `종가 ≤ ${usd(t.nextSell.price)} → 주식 ${t.nextSell.stockAfter}%`),
+    t.nextBuy && li(`말뚝박기 매수 (-${t.nextBuy.pct}%)`, `장중 ${usd(t.nextBuy.price)} 도달 → 주식 ${t.nextBuy.stockAfter}%`),
+    t.nextSell && li(`현금화 매도 (-${t.nextSell.pct}%)`, `장중 ${usd(t.nextSell.price)} 도달 → 주식 ${t.nextSell.stockAfter}%`),
     t.vPrice && li('V자 반등 전량 매수', `종가 ≥ ${usd(t.vPrice.price)}`),
     li('전고점 돌파 전량 매수', `종가 > ${usd(t.ath)}`),
     li('마삼 (나스닥 -3%)', `지수 ≤ ${t.mamsamIxic.toLocaleString('en-US', { maximumFractionDigits: 0 })}`),
