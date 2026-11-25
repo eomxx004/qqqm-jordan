@@ -32,7 +32,10 @@
   ul.list li { display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid var(--line); font-size:14px; }
   ul.list li:first-child { border-top:0; }
   ul.list li span:last-child { text-align:right; font-variant-numeric: tabular-nums; }
-  table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric: tabular-nums; }
+  html, body { overflow-x:hidden; word-break:keep-all; overflow-wrap:anywhere; }
+  .card { min-width:0; overflow:hidden; }
+  table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric: tabular-nums; table-layout:fixed; }
+  th { font-size:12px; white-space:normal; line-height:1.3; }
   th, td { padding:6px 4px; text-align:right; border-top:1px solid var(--line); }
   th { color:var(--dim); font-weight:600; border-top:0; }
   th:first-child, td:first-child { text-align:left; }
@@ -54,6 +57,10 @@
   .mamsam b { color:var(--up); }
   .order { margin-top:6px; font-size:14px; }
   .order b { font-size:20px; }
+  .conds { margin-top:10px; border-top:1px solid var(--line); }
+  .conds li { font-size:13px; }
+  .conds li span:last-child { color:var(--up); font-weight:600; }
+  .ind li span:last-child b { margin-right:8px; }
   .msg b { display:block; } .msg pre { white-space:pre-wrap; margin:2px 0 0; font:inherit; color:var(--dim); font-size:13px; }
 </style>
 </head>
@@ -73,6 +80,7 @@
     <div class="reason" id="todayReason"></div>
     <div class="bar"><i id="stockBar" style="width:0"></i></div>
     <div class="reason" id="stockText"></div>
+    <ul class="list conds" id="conds"></ul>
     <label class="check hidden" id="doneWrap"><input type="checkbox" id="done"> 실행 완료</label>
   </section>
 
@@ -86,14 +94,9 @@
     <div class="grid">
       <div class="stat"><small id="priceLabel">QQQM</small><b id="price">—</b></div>
       <div class="stat"><small>전고점 대비</small><b id="dd">—</b></div>
-      <div class="stat"><small>나스닥 종합 일간</small><b id="ixic">—</b></div>
-      <div class="stat"><small id="athLabel">전고점</small><b id="ath">—</b></div>
     </div>
-  </section>
-
-  <section class="card">
-    <h2>다음 신호</h2>
-    <ul class="list" id="triggers"></ul>
+    <div class="reason" id="athLabel" style="margin-top:4px"></div>
+    <ul class="list ind" id="indicators" style="margin-top:10px"></ul>
   </section>
 
   <section class="card">
@@ -108,7 +111,7 @@
   <section class="card">
     <h2>구간표 (전고점 <span id="tableAth"></span> 기준 · 자동 갱신)</h2>
     <table>
-      <thead><tr><th>하락률</th><th>가격</th><th>1단계 주식</th><th>말뚝박기 주식</th></tr></thead>
+      <thead><tr><th>하락률</th><th>가격</th><th>1단계 (리밸런싱)</th><th>2단계 (말뚝박기)</th></tr></thead>
       <tbody id="table"></tbody>
     </table>
   </section>

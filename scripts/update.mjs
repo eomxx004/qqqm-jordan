@@ -1,6 +1,6 @@
 // 15분마다 GitHub Actions에서 실행: 시세 수집 → 룰 계산 → 앱 데이터(docs/data/latest.json) 갱신 → 푸시 발송
 import { run, step, nextTriggers, zoneTable, DEFAULTS } from '../engine/jordan.mjs';
-import { loadMarket } from './data.mjs';
+import { loadMarket, loadIndicators } from './data.mjs';
 import fs from 'node:fs';
 
 const DIR = new URL('../docs/data/', import.meta.url);
@@ -8,7 +8,7 @@ fs.mkdirSync(DIR, { recursive: true });
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(new URL(f, DIR), 'utf8')); } catch { return d; } };
 const writeJson = (f, v) => fs.writeFileSync(new URL(f, DIR), JSON.stringify(v, null, 1));
 
-const { bars, open } = await loadMarket();
+const [{ bars, open }, indicators] = await Promise.all([loadMarket(), loadIndicators()]);
 const conf = run(open ? bars.slice(0, -1) : bars);
 const lastConf = conf.signals.at(-1);
 let prov = null;
@@ -97,6 +97,7 @@ writeJson('latest.json', {
   updatedAt: now,
   market: open ? 'open' : 'closed',
   live,
+  indicators,
   confirmed: { signal: lastConf, triggers: conf.triggers,
     state: { mode: s.mode, stock: s.stock, ath: s.ath, athDate: s.athDate, maxDD: s.maxDD, panic: s.panic, panicUntil: s.panicUntil, mamsamDates: s.mamsamDates, lastMamsam: s.lastMamsam } },
   provisional: prov,

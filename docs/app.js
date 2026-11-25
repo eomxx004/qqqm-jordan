@@ -33,7 +33,7 @@ function render() {
   // 오늘 할 일 (확정 종가 기준)
   $('#todayTitle').textContent = `${sig.date} 종가 기준 · ${MODE[st.mode]}${st.panic ? ' · 공황 대기' : ''}`;
   renderOrder();
-  $('#todayReason').textContent = sig.reasons.join(' · ') || '조건 변화 없음';
+  $('#todayReason').textContent = sig.reasons.length ? '오늘: ' + sig.reasons.join(' · ') : '';
   $('#stockBar').style.width = st.stock + '%';
   $('#stockText').textContent = `목표 비중: 주식 ${st.stock}% / 현금 ${100 - st.stock}%`;
   const doneKey = 'done-' + sig.date;
@@ -54,22 +54,27 @@ function render() {
   $('#price').textContent = usd(live.close);
   $('#dd').textContent = (-live.dd).toFixed(2) + '%';
   $('#dd').className = live.dd > 0 ? 'neg' : '';
-  $('#ixic').textContent = sgn(live.ixicChg);
-  $('#ixic').className = live.ixicChg < 0 ? 'neg' : 'pos';
-  $('#athLabel').textContent = `전고점 (${st.athDate})`;
-  $('#ath').textContent = usd(st.ath);
+  $('#athLabel').textContent = `전고점 ${usd(st.ath)} (${st.athDate} 종가)`;
 
-  // 다음 신호
+  // 시장 지표
+  const num = (v, d = 2) => v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const IND = {
+    ixic: v => num(v.price), spx: v => num(v.price),
+    tnx: v => v.price.toFixed(3) + '%', gold: v => '$' + num(v.price, 1), krw: v => '₩' + num(v.price, 1),
+  };
+  const chgText = (k, v) => k === 'tnx' ? `${v.diff >= 0 ? '+' : ''}${(v.diff * 100).toFixed(1)}bp` : sgn(v.chg);
+  $('#indicators').innerHTML = Object.entries(IND).filter(([k]) => data.indicators?.[k]).map(([k, f]) => {
+    const v = data.indicators[k];
+    return `<li><span>${v.name}</span><span><b>${f(v)}</b><span class="${v.chg < 0 ? 'neg' : 'pos'}">${chgText(k, v)}</span></span></li>`;
+  }).join('');
+
+  // 오늘 할 일 카드 아래: 꼭 알아야 할 조건만
   const t = c.triggers, li = (a, b) => `<li><span>${a}</span><span>${b}</span></li>`;
-  $('#triggers').innerHTML = [
-    t.nextBuy && li(`말뚝박기 매수 (-${t.nextBuy.pct}%)`, `장중 ${usd(t.nextBuy.price)} 도달 → 주식 ${t.nextBuy.stockAfter}%`),
-    t.nextSell && li(`현금화 매도 (-${t.nextSell.pct}%)`, `장중 ${usd(t.nextSell.price)} 도달 → 주식 ${t.nextSell.stockAfter}%`),
-    t.vPrice && li('V자 반등 전량 매수', `종가 ≥ ${usd(t.vPrice.price)}`),
-    li('전고점 돌파 전량 매수', `종가 > ${usd(t.ath)}`),
-    li('마삼 (나스닥 -3%)', `지수 ≤ ${t.mamsamIxic.toLocaleString('en-US', { maximumFractionDigits: 0 })}`),
-    li('나스닥 연속 상승', `${t.upStreak} / ${t.upStreakNeed}일`),
-    li('최근 1개월 마삼', `${t.recentMamsam} / 4회 (공황 기준)`),
-    t.panic && li('공황 종료 예정', `${t.panicUntil} 이후 첫 거래일`),
+  $('#conds').innerHTML = [
+    st.stock < 100 && t.vPrice && li('V자 반등 → 전량 매수', `종가 ${usd(t.vPrice.price)} 이상`),
+    st.stock < 100 && li('연속 상승 → 전량 매수', `나스닥 ${t.upStreak}/${t.upStreakNeed}일`),
+    st.mode !== 'STAKE' && li('마삼 → 말뚝박기 전환', `나스닥 종가 ${num(t.mamsamIxic, 0)} 이하`),
+    t.panic ? li('공황 종료 → 전량 매수', `${t.panicUntil} 이후`) : t.recentMamsam > 1 && li('최근 1개월 마삼', `${t.recentMamsam}/4회 (4회면 공황)`),
   ].filter(Boolean).join('');
 
   // 구간표
@@ -78,7 +83,7 @@ function render() {
   $('#table').innerHTML = data.table.map((r, i) => {
     const nextPct = data.table[i + 1]?.pct ?? Infinity;
     const here = dd >= r.pct - 1e-9 && dd < nextPct - 1e-9;
-    return `<tr class="${here ? 'here' : ''}"><td>${here ? '👉 ' : ''}-${r.pct.toFixed(1)}%</td><td>${usd(r.price)}</td><td>${r.rebalStock == null ? '' : r.rebalStock + '%'}</td><td>${r.stakeStock == null ? '' : r.stakeStock + '%'}</td></tr>`;
+    return `<tr class="${here ? 'here' : ''}"><td>${here ? '👉 ' : ''}${r.pct ? '-' + r.pct.toFixed(1) + '%' : '전고점'}</td><td>${usd(r.price)}</td><td>${r.rebalStock == null ? '' : r.rebalStock + '%'}</td><td>${r.stakeStock == null ? '' : r.stakeStock + '%'}</td></tr>`;
   }).join('');
 
   $('#history').innerHTML = data.history.map(h =>
@@ -102,7 +107,7 @@ function renderOrder() {
     qty = o.side === '매수' ? Math.min(qty, Math.floor(cash / o.price)) : Math.min(qty, Math.floor(shares));
   }
   const orderLine = o && (qty != null ? `<b>${usd(o.price)}에 ${qty}주 ${o.side}</b> 걸어두세요`
-    : `<b>${usd(o.price)}에 주식 10%p ${o.side}</b> 걸어두세요 <span class="reason">(내 계좌를 입력하면 주수가 나와요)</span>`);
+    : `<b>${usd(o.price)}에 주식 10%p ${o.side}</b> 걸어두세요<div class="reason" style="font-size:12px;font-weight:400">내 계좌를 입력하면 주수가 나와요</div>`);
   const detail = o && `<div class="reason">다음 구간 -${o.pct}% · ${o.how} · 체결되면 주식 ${o.stockAfter}%</div>`;
 
   if (sig.action === 'HOLD' && o) {

@@ -34,6 +34,34 @@ export async function loadMarket() {
   return { bars, open };
 }
 
+// 시장 지표: 최근 두 거래일 값으로 현재값·일간 변화 계산
+export const INDICATORS = [
+  { key: 'ixic', symbol: '^IXIC', name: '나스닥 종합' },
+  { key: 'spx', symbol: '^GSPC', name: 'S&P 500' },
+  { key: 'tnx', symbol: '^TNX', name: '미국채 10년' },
+  { key: 'gold', symbol: 'GC=F', name: '금 ($/oz)' },
+  { key: 'krw', symbol: 'KRW=X', name: '원/달러' },
+];
+
+export async function loadIndicators() {
+  const out = {};
+  await Promise.all(INDICATORS.map(async ({ key, symbol, name }) => {
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=10d&interval=1d`;
+      const r = (await (await fetch(url, { headers: UA })).json()).chart.result[0];
+      const closes = r.indicators.quote[0].close.filter(c => c != null);
+      const price = r.meta.regularMarketPrice ?? closes.at(-1);
+      // 오늘 봉이 있으면 그 전날 종가가 기준, 없으면 마지막 종가가 기준
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: r.meta.exchangeTimezoneName });
+      const lastDate = fmt.format(new Date(r.timestamp.at(-1) * 1000));
+      const priceDate = fmt.format(new Date(r.meta.regularMarketTime * 1000));
+      const prev = lastDate === priceDate ? closes.at(-2) : closes.at(-1);
+      out[key] = { name, price, prev, chg: (price / prev - 1) * 100, diff: price - prev, date: priceDate };
+    } catch (e) { console.error(`${symbol} 지표 실패`, e.message); }
+  }));
+  return out;
+}
+
 export async function loadBars() {
   const { bars, open } = await loadMarket();
   return open ? bars.slice(0, -1) : bars; // 확정된 종가만
