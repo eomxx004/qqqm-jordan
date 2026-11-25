@@ -23,31 +23,28 @@ const usd = v => '$' + v.toFixed(2);
 const sgn = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%';
 const actionText = s => s.action === 'BUY' ? `주식 ${s.delta}%p 매수 → 목표 주식 ${s.stock}%`
   : s.action === 'SELL' ? `주식 ${-s.delta}%p 매도 → 목표 주식 ${s.stock}%` : `할 일 없음 (목표 주식 ${s.stock}%)`;
+// 현재가 아래 2구간에 걸어둘 주문
+const orderLines = t => (t.orders || []).map(o =>
+  `  · ${usd(o.price)} (-${o.pct}%) 주식 ${o.size}%p ${o.side === 'BUY' ? '지정가 매수' : '감시(스탑) 매도'} → 주식 ${o.stockAfter}%`);
 const nextLines = t => [
-  t.nextBuy && `다음 매수: 장중 ${usd(t.nextBuy.price)} 도달 (-${t.nextBuy.pct}%) → 주식 ${t.nextBuy.stockAfter}%`,
-  t.nextSell && `다음 매도: 장중 ${usd(t.nextSell.price)} 도달 (-${t.nextSell.pct}%) → 주식 ${t.nextSell.stockAfter}%`,
   t.vPrice && `V자 반등 전량매수: 종가 ${usd(t.vPrice.price)} 이상`,
 ].filter(Boolean);
 
 const notified = readJson('notified.json', { daily: null, alerts: {} });
 const msgs = [];
 
-// 할 일이 없을 때: 바로 밑 구간에 걸어둘 주문
-const nextOrder = t => t.nextBuy ? { side: '매수', how: '지정가 매수', ...t.nextBuy }
-  : t.nextSell ? { side: '매도', how: '감시(스탑) 매도', ...t.nextSell } : null;
-
 if (!open && notified.daily !== lastConf.date) {
-  const o = nextOrder(conf.triggers);
+  const t = conf.triggers, o = t.orders?.[0];
   const hold = lastConf.action === 'HOLD';
   msgs.push({
     tag: 'daily',
-    title: `📊 ${lastConf.date.slice(5)} QQQM ${!hold ? (lastConf.action === 'BUY' ? '매수 신호' : '매도 신호') : o ? `${usd(o.price)} ${o.side} 걸기` : '보유 유지'}`,
+    title: `📊 ${lastConf.date.slice(5)} QQQM ${!hold ? (lastConf.action === 'BUY' ? '매수 신호' : '매도 신호') : o ? `${t.orders.map(x => usd(x.price)).join(' · ')} ${o.side === 'BUY' ? '매수' : '매도'} 걸기` : '보유 유지'}`,
     body: [
       `종가 ${usd(lastConf.close)} (전고점 대비 -${lastConf.dd.toFixed(1)}%) · 나스닥 ${sgn(lastConf.ixicChg)}`,
-      hold && o ? `👉 다음 구간 ${usd(o.price)} (-${o.pct}%)에 주식 10%p ${o.how} 걸어두기 → 주식 ${o.stockAfter}%`
-        : `👉 ${actionText(lastConf)}`,
+      hold ? `👉 목표 주식 ${conf.state.stock}% · 아래 구간에 주문 걸어두기` : `👉 ${actionText(lastConf)}`,
+      ...orderLines(t),
       ...lastConf.reasons,
-      ...nextLines(conf.triggers).filter(l => !(hold && o && l.startsWith('다음'))),
+      ...nextLines(t),
     ].join('\n'),
   });
   notified.daily = lastConf.date;

@@ -79,22 +79,20 @@ function render() {
 
   // 구간표
   $('#tableAth').textContent = usd(st.ath);
-  // 👉 현재가 위치 · ✅ 이번 하락에서 이미 체결된 구간 · 🎯 다음 주문 구간
+  // 👉 현재가 줄을 구간 사이에 끼워 넣고, 🎯 걸어둘 2구간을 표시
   const dd = live.dd, stake = st.mode === 'STAKE';
-  const nextPct = (t.nextBuy || t.nextSell)?.pct;
-  const cell = (v, active, pct) => {
-    if (v == null) return '';
-    if (!active || !pct) return v + '%';
-    if (Math.abs(pct - nextPct) < 1e-9) return `🎯 <b>${v}%</b>`;
-    if (pct <= st.maxDD + 1e-9 && st.stock < 100) return `✅ ${v}%`;
-    return v + '%';
-  };
-  $('#table').innerHTML = data.table.map((r, i) => {
+  const orderPcts = (t.orders || []).map(o => o.pct);
+  const isOrder = pct => orderPcts.some(p => Math.abs(p - pct) < 1e-9);
+  const cell = (v, active, pct) => v == null ? '' : active && pct && isOrder(pct) ? `🎯 <b>${v}%</b>` : v + '%';
+  const rows = [];
+  data.table.forEach((r, i) => {
+    rows.push(`<tr class="${isOrder(r.pct) ? 'next' : ''}"><td>${r.pct ? '-' + r.pct.toFixed(1) + '%' : '전고점'}</td><td>${usd(r.price)}</td><td class="${stake ? 'off' : ''}">${cell(r.rebalStock, !stake, r.pct)}</td><td class="${stake ? '' : 'off'}">${cell(r.stakeStock, stake, r.pct)}</td></tr>`);
     const np = data.table[i + 1]?.pct ?? Infinity;
-    const here = dd >= r.pct - 1e-9 && dd < np - 1e-9;
-    const isNext = Math.abs(r.pct - nextPct) < 1e-9;
-    return `<tr class="${here ? 'here' : ''} ${isNext ? 'next' : ''}"><td>${here ? '👉 ' : ''}${r.pct ? '-' + r.pct.toFixed(1) + '%' : '전고점'}</td><td>${usd(r.price)}</td><td class="${stake ? 'off' : ''}">${cell(r.rebalStock, !stake, r.pct)}</td><td class="${stake ? '' : 'off'}">${cell(r.stakeStock, stake, r.pct)}</td></tr>`;
-  }).join('');
+    if (dd >= r.pct - 1e-9 && dd < np - 1e-9) {
+      rows.push(`<tr class="here"><td>👉 -${dd.toFixed(2)}%</td><td>${usd(live.close)}</td><td colspan="2">현재가 · 주식 ${st.stock}%</td></tr>`);
+    }
+  });
+  $('#table').innerHTML = rows.join('');
 
   $('#history').innerHTML = data.history.map(h =>
     `<li><span class="d">${h.date} · $${h.close.toFixed(2)} (-${h.dd.toFixed(1)}%)</span><br><b class="${h.action === 'BUY' ? 'pos' : h.action === 'SELL' ? 'neg' : ''}">${actionText(h)} → 주식 ${h.stock}%</b><br>${esc(h.reasons.join(' · '))}</li>`).join('');
@@ -105,31 +103,38 @@ function render() {
   renderAccount();
 }
 
-// 할 일이 없으면 바로 밑 구간에 걸어둘 주문을 보여준다 (주문 1건 = 총자산의 10%)
+// 현재가 아래 2구간에 걸어둘 주문 (주문 크기 = 총자산 × 그 구간의 비중 증가분)
 function renderOrder() {
-  const sig = data.confirmed.signal, t = data.confirmed.triggers;
-  const o = t.nextBuy ? { side: '매수', how: '지정가 매수', ...t.nextBuy } : t.nextSell ? { side: '매도', how: '감시(스탑) 매도', ...t.nextSell } : null;
+  const sig = data.confirmed.signal, orders = data.confirmed.triggers.orders || [];
   const shares = +$('#shares').value || 0, cash = +$('#cash').value || 0;
   const total = shares * data.live.close + cash;
-  let qty = null;
-  if (o && total > 0) {
-    qty = Math.round(total * 0.1 / o.price);
-    qty = o.side === '매수' ? Math.min(qty, Math.floor(cash / o.price)) : Math.min(qty, Math.floor(shares));
-  }
-  const orderLine = o && (qty != null ? `<b>${usd(o.price)}에 ${qty}주 ${o.side}</b> 걸어두세요`
-    : `<b>${usd(o.price)}에 주식 10%p ${o.side}</b> 걸어두세요<div class="reason" style="font-size:12px;font-weight:400">내 계좌를 입력하면 주수가 나와요</div>`);
-  const detail = o && `<div class="reason">다음 구간 -${o.pct}% · ${o.how} · 체결되면 주식 ${o.stockAfter}%</div>`;
+  let cashLeft = cash, sharesLeft = shares;
+  const lines = orders.map(o => {
+    const side = o.side === 'BUY' ? '매수' : '매도';
+    let what = `주식 ${o.size}%p`;
+    if (total > 0) {
+      let q = Math.round(total * o.size / 100 / o.price);
+      q = o.side === 'BUY' ? Math.min(q, Math.floor(cashLeft / o.price)) : Math.min(q, Math.floor(sharesLeft));
+      if (o.side === 'BUY') cashLeft -= q * o.price; else sharesLeft -= q;
+      what = `${q}주`;
+    }
+    return `<div><b>${usd(o.price)}에 ${what} ${side}</b> <span class="reason">(-${o.pct}% → 주식 ${o.stockAfter}%)</span></div>`;
+  });
+  const how = orders[0]?.side === 'SELL' ? '감시(스탑) 매도' : '지정가 매수';
+  const hint = total > 0 ? '' : '<div class="reason" style="font-size:12px">내 계좌를 입력하면 주수가 나와요</div>';
 
-  if (sig.action === 'HOLD' && o) {
-    $('#todayAction').innerHTML = orderLine;
-    $('#todayAction').className = 'action ' + (o.side === '매수' ? 'BUY' : 'SELL');
-    $('#order').innerHTML = detail;
+  if (sig.action === 'HOLD' && orders.length) {
+    $('#todayAction').innerHTML = `아래 ${orders.length}구간에 ${how}를 걸어두세요`;
+    $('#todayAction').className = 'action ' + orders[0].side;
+    $('#todayAction').style.fontSize = '18px';
+    $('#order').innerHTML = `<div class="${orders[0].side === 'BUY' ? 'pos' : 'neg'}">${lines.join('')}</div>${hint}`;
   } else {
     $('#todayAction').textContent = sig.action === 'HOLD' ? '보유 유지' : actionText(sig);
     $('#todayAction').className = 'action ' + sig.action;
-    $('#order').innerHTML = o ? `다음 주문: ${orderLine}${detail}` : '';
+    $('#todayAction').style.fontSize = '';
+    $('#order').innerHTML = orders.length ? `<div class="reason">다음 주문 (${how})</div>${lines.join('')}${hint}` : '';
   }
-  $('#order').classList.toggle('hidden', !o);
+  $('#order').classList.toggle('hidden', !orders.length);
 }
 
 function renderAccount() {
