@@ -79,11 +79,21 @@ function render() {
 
   // 구간표
   $('#tableAth').textContent = usd(st.ath);
-  const dd = live.dd;
+  // 👉 현재가 위치 · ✅ 이번 하락에서 이미 체결된 구간 · 🎯 다음 주문 구간
+  const dd = live.dd, stake = st.mode === 'STAKE';
+  const nextPct = (t.nextBuy || t.nextSell)?.pct;
+  const cell = (v, active, pct) => {
+    if (v == null) return '';
+    if (!active || !pct) return v + '%';
+    if (Math.abs(pct - nextPct) < 1e-9) return `🎯 <b>${v}%</b>`;
+    if (pct <= st.maxDD + 1e-9 && st.stock < 100) return `✅ ${v}%`;
+    return v + '%';
+  };
   $('#table').innerHTML = data.table.map((r, i) => {
-    const nextPct = data.table[i + 1]?.pct ?? Infinity;
-    const here = dd >= r.pct - 1e-9 && dd < nextPct - 1e-9;
-    return `<tr class="${here ? 'here' : ''}"><td>${here ? '👉 ' : ''}${r.pct ? '-' + r.pct.toFixed(1) + '%' : '전고점'}</td><td>${usd(r.price)}</td><td>${r.rebalStock == null ? '' : r.rebalStock + '%'}</td><td>${r.stakeStock == null ? '' : r.stakeStock + '%'}</td></tr>`;
+    const np = data.table[i + 1]?.pct ?? Infinity;
+    const here = dd >= r.pct - 1e-9 && dd < np - 1e-9;
+    const isNext = Math.abs(r.pct - nextPct) < 1e-9;
+    return `<tr class="${here ? 'here' : ''} ${isNext ? 'next' : ''}"><td>${here ? '👉 ' : ''}${r.pct ? '-' + r.pct.toFixed(1) + '%' : '전고점'}</td><td>${usd(r.price)}</td><td class="${stake ? 'off' : ''}">${cell(r.rebalStock, !stake, r.pct)}</td><td class="${stake ? '' : 'off'}">${cell(r.stakeStock, stake, r.pct)}</td></tr>`;
   }).join('');
 
   $('#history').innerHTML = data.history.map(h =>
