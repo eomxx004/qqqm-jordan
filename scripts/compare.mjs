@@ -22,11 +22,10 @@ function simulate(cfg) {
 }
 
 const variants = [
-  ['현행: -5%마다 10%p (-50% 완료)', { stakeStep: 5, stakeCurve: 'flat', stakeEnd: 50 }],
+  ['처음 방식: -5%마다 10%p', { stakeStep: 5, stakeCurve: 'flat', stakeEnd: 50, rebaseAfter: null }],
+  ['어제 방식: 2.5% 비례 -50%', { stakeStep: 2.5, stakeCurve: 'linear', stakeEnd: 50, rebaseAfter: null }],
+  ['새 방식: -25%까지 비례, 이후 같은 양', { stakeStep: 2.5, stakeCurve: 'ramp', stakeRampEnd: 25, stakeEnd: 50, rebaseAfter: null }],
 ];
-for (const end of [50, 40, 30]) for (const vs of [5, 2.5]) {
-  variants.push([`2.5% 비례 (-${end}% 완료) V자 ${vs * 2}%`, { stakeStep: 2.5, stakeCurve: 'linear', stakeEnd: end, stakeVStep: vs }]);
-}
 for (const [name, v] of variants) {
   const cfg = { ...DEFAULTS, ...v };
   const r = simulate(cfg);

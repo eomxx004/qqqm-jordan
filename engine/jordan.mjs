@@ -6,7 +6,8 @@ export const DEFAULTS = {
   rebalUnit: 10,       //        주식 10%p 매도 (처음 기준)
   stakeStep: 2.5,      // 2단계 말뚝박기: 전고점 대비 -2.5%마다
   stakeEnd: 50,        //        전고점 대비 -50%에서 주식 100%
-  stakeCurve: 'linear',//        flat: 구간마다 같은 양 / linear: 깊을수록 비례해서 더 많이
+  stakeCurve: 'ramp',  //        flat: 구간마다 같은 양 / linear: 깊을수록 비례 / ramp: rampEnd까지 비례, 그 뒤 같은 양
+  stakeRampEnd: 25,    //        -25%까지 비례 증가, -25%~-50%는 같은 양
   stakeUnit: 10,       //        (flat일 때 구간당 10%p)
   stakeVStep: 5,       // 말뚝박기 중 V자 반등을 세는 구간 크기 (2구간 = 10% 반등)
   mamsam: -3,          // 나스닥 종합지수 전일 대비 -3% 이하 = 마삼
@@ -25,12 +26,15 @@ const priceAt = (ath, pct) => ath * (1 - pct / 100);
 
 // 말뚝박기 z번째 구간까지 왔을 때의 누적 주식 비중 %
 // linear: k번째 구간에서 k만큼 산다 → 누적 = z(z+1) / N(N+1)
+// ramp: k번째 구간에서 min(k, R)만큼 산다 (R = stakeRampEnd까지 비례 증가, 그 뒤로는 같은 양)
 export function stakeStock(z, cfg = DEFAULTS) {
   const n = Math.round(cfg.stakeEnd / cfg.stakeStep);
   if (z <= 0) return 0;
   if (z >= n) return 100;
-  const v = cfg.stakeCurve === 'linear' ? 100 * z * (z + 1) / (n * (n + 1)) : 100 * z / n;
-  return Math.round(v * 10) / 10;
+  const w = k => cfg.stakeCurve === 'flat' ? 1 : cfg.stakeCurve === 'ramp' ? Math.min(k, Math.round(cfg.stakeRampEnd / cfg.stakeStep)) : k;
+  let cum = 0, total = 0;
+  for (let k = 1; k <= n; k++) { total += w(k); if (k <= z) cum += w(k); }
+  return Math.round(1000 * cum / total) / 10;
 }
 
 // 'YYYY-MM-DD'에 m개월 + d일을 더한다. 말일 넘침은 그 달 말일로 맞춘다.
