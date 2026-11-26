@@ -100,6 +100,7 @@ function render() {
     `<li class="msg"><span class="d">${kst(m.at)}</span><b>${esc(m.title)}</b><pre>${esc(m.body)}</pre></li>`).join('') || '<li>아직 없음</li>';
 
   $('#updated').textContent = `데이터 갱신: ${kst(data.updatedAt)} (장중 약 15분 간격)`;
+  renderFills();
   renderAccount();
 }
 
@@ -136,6 +137,52 @@ function renderOrder() {
   }
   $('#order').classList.toggle('hidden', !orders.length);
 }
+
+// ── '체결 못함' 버튼: GitHub에 그날 종가에서 다시 시작하라고 요청 ──
+const REPO = 'eomxx004/qqqm-jordan';
+const pending = () => JSON.parse(localStorage.getItem('unfilledPending') || '{}');
+
+function renderFills() {
+  const fills = data.fills || [], p = pending();
+  $('#fillsWrap').classList.toggle('hidden', !fills.length);
+  $('#fills').innerHTML = fills.map(f => {
+    const done = (data.corrections || []).includes(f.date), asked = p[f.date] && !done;
+    return `<li><span>${f.date.slice(5).replace('-', '/')}${f.today ? ' (오늘 장중)' : ''} · <b>${usd(f.price)}</b> ${f.side === 'BUY' ? '매수' : '매도'}<br><span class="reason">${esc(f.why)}</span></span>
+      <span><button data-date="${f.date}" ${asked ? 'disabled' : ''}>${asked ? '요청됨 · 반영 중' : '체결 못함'}</button></span></li>`;
+  }).join('');
+  $('#fills').querySelectorAll('button[data-date]').forEach(b => b.onclick = () => markUnfilled(b.dataset.date, b));
+}
+
+async function markUnfilled(date, btn) {
+  const token = localStorage.getItem('ghToken');
+  if (!token) { alert("먼저 아래 '체결 못함 버튼 설정'에 GitHub 토큰을 저장해 주세요."); $('#ghToken').scrollIntoView({ behavior: 'smooth' }); return; }
+  if (!confirm(`${date} 체결을 취소하고, 그날 종가 위치에서 다시 계산할까요?\n(두 분 폰 모두에 반영돼요)`)) return;
+  btn.disabled = true; btn.textContent = '요청 중…';
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/update.yml/dispatches`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: 'main', inputs: { unfilled: date } }),
+    });
+    if (r.status !== 204) throw new Error(r.status === 401 || r.status === 403 || r.status === 404 ? '토큰 권한을 확인해 주세요' : `오류 ${r.status}`);
+    localStorage.setItem('unfilledPending', JSON.stringify({ ...pending(), [date]: Date.now() }));
+    btn.textContent = '요청됨 · 반영 중';
+    alert('요청했어요. 1~2분 뒤 앱과 알림에 반영돼요.');
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '체결 못함';
+    alert('요청 실패: ' + e.message);
+  }
+}
+
+$('#ghToken').value = localStorage.getItem('ghToken') ? '••••••••' : '';
+$('#tokenState').textContent = localStorage.getItem('ghToken') ? '저장됨 ✓' : '';
+$('#tokenBtn').onclick = () => {
+  const v = $('#ghToken').value.trim();
+  if (!v || v.startsWith('••')) return;
+  localStorage.setItem('ghToken', v);
+  $('#ghToken').value = '••••••••';
+  $('#tokenState').textContent = '저장됨 ✓';
+};
 
 function renderAccount() {
   if (!data) return;

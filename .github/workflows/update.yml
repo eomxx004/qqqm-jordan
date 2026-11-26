@@ -12,6 +12,10 @@ on:
         description: '테스트 푸시 보내기'
         type: boolean
         default: false
+      unfilled:
+        description: '체결 못함 날짜 (YYYY-MM-DD) — 그날 종가에서 다시 시작'
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -31,6 +35,19 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      - name: 체결 못함 기록
+        if: ${{ inputs.unfilled != '' && inputs.unfilled != null }}
+        env:
+          UNFILLED: ${{ inputs.unfilled }}
+        run: |
+          node -e "
+            const fs = require('fs'), d = process.env.UNFILLED.trim(), f = 'docs/data/corrections.json';
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { console.error('날짜 형식 오류:', d); process.exit(1); }
+            const a = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : [];
+            if (!a.includes(d)) a.push(d);
+            fs.writeFileSync(f, JSON.stringify(a.sort()) + '\n');
+            console.log('체결 못함 기록:', d);
+          "
       - run: node scripts/update.mjs
         env:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}

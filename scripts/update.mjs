@@ -1,5 +1,5 @@
 // 15분마다 GitHub Actions에서 실행: 시세 수집 → 룰 계산 → 앱 데이터(docs/data/latest.json) 갱신 → 푸시 발송
-import { run, step, nextTriggers, zoneTable, DEFAULTS } from '../engine/jordan.mjs';
+import { run, step, rebase, markRebased, nextTriggers, zoneTable, DEFAULTS } from '../engine/jordan.mjs';
 import { loadMarket, loadIndicators } from './data.mjs';
 import fs from 'node:fs';
 
@@ -8,15 +8,27 @@ fs.mkdirSync(DIR, { recursive: true });
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(new URL(f, DIR), 'utf8')); } catch { return d; } };
 const writeJson = (f, v) => fs.writeFileSync(new URL(f, DIR), JSON.stringify(v, null, 1));
 
+// '체결 못함'으로 등록된 날짜: 그날 종가에서 다시 시작
+const corrections = readJson('corrections.json', []);
+const cfg = { ...DEFAULTS, rebaseDates: corrections };
+
 const [{ bars, open }, indicators] = await Promise.all([loadMarket(), loadIndicators()]);
-const conf = run(open ? bars.slice(0, -1) : bars);
+const conf = run(open ? bars.slice(0, -1) : bars, cfg);
 const lastConf = conf.signals.at(-1);
 let prov = null;
 if (open) {
-  const r = step(conf.state, bars.at(-1));
-  prov = { signal: r.signal, triggers: nextTriggers(r.state) };
+  const bar = bars.at(-1), r = step(conf.state, bar, cfg);
+  const st = corrections.includes(bar.date) ? rebase(r.state, bar.close, cfg) : r.state;
+  if (st !== r.state) markRebased(r.signal, st, lastConf);
+  prov = { signal: r.signal, triggers: nextTriggers(st, cfg) };
 }
 const live = prov ? prov.signal : lastConf;
+
+// '체결 못함' 버튼용: 마지막 재시작 이후 최근 3거래일의 장중 체결 (오늘 장중 포함)
+const recent = [...conf.signals.slice(-3), ...(prov ? [prov.signal] : [])];
+const lastRebase = recent.findLastIndex(s => s.rebased);
+const fills = recent.slice(lastRebase + 1).flatMap(s => s.trades.filter(t => t.kind === 'fill')
+  .map(t => ({ date: s.date, price: t.price, side: t.to > t.from ? 'BUY' : 'SELL', why: t.why, today: s === prov?.signal })));
 
 // ── 알림 메시지 만들기 ──
 const usd = v => '$' + v.toFixed(2);
@@ -95,6 +107,8 @@ writeJson('latest.json', {
   market: open ? 'open' : 'closed',
   live,
   indicators,
+  fills,
+  corrections,
   confirmed: { signal: lastConf, triggers: conf.triggers,
     state: { mode: s.mode, stock: s.stock, ath: s.ath, athDate: s.athDate, maxDD: s.maxDD, panic: s.panic, panicUntil: s.panicUntil, mamsamDates: s.mamsamDates, lastMamsam: s.lastMamsam } },
   provisional: prov,

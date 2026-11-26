@@ -42,6 +42,10 @@
   tr.here td { background:rgba(245,165,36,.18); font-weight:700; color:var(--text) !important; opacity:1 !important; }
   tr.next td { background:rgba(229,72,77,.12); color:var(--up); font-weight:700; }
   .legend { font-size:12px; color:var(--dim); margin-top:8px; }
+  .fills li { align-items:center; }
+  .fills button { width:auto; margin:0; padding:6px 10px; font-size:13px; background:var(--line); color:var(--text); }
+  .fills button:disabled { opacity:.6; }
+  input[type=password] { width:100%; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:14px; }
   td.off { color:var(--dim) !important; font-weight:400 !important; opacity:.6; }
   .prov { border-color: var(--warn); }
   .prov h2 { color: var(--warn); }
@@ -84,6 +88,10 @@
     <div class="bar"><i id="stockBar" style="width:0"></i></div>
     <div class="reason" id="stockText"></div>
     <ul class="list conds" id="conds"></ul>
+    <div id="fillsWrap" class="hidden">
+      <div class="reason" style="margin-top:10px">최근 체결로 계산된 주문 · 실제로 못 샀다면 눌러주세요</div>
+      <ul class="list fills" id="fills"></ul>
+    </div>
     <label class="check hidden" id="doneWrap"><input type="checkbox" id="done"> 실행 완료</label>
   </section>
 
@@ -140,6 +148,15 @@
       <textarea id="subJson" readonly></textarea>
       <button id="copyBtn" class="ghost">코드 복사</button>
     </div>
+  </section>
+
+  <section class="card">
+    <h2>'체결 못함' 버튼 설정</h2>
+    <div class="reason">버튼을 쓰려면 GitHub 토큰이 한 번 필요해요. 토큰은 이 폰에만 저장돼요.</div>
+    <label style="margin-top:10px">GitHub 토큰</label>
+    <input type="password" id="ghToken" placeholder="github_pat_..." autocomplete="off">
+    <button id="tokenBtn" class="ghost">저장</button>
+    <div class="reason" id="tokenState" style="margin-top:6px"></div>
   </section>
 
   <div class="reason" style="text-align:center" id="updated"></div>

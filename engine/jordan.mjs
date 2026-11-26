@@ -16,7 +16,7 @@ export const DEFAULTS = {
   panicCount: 4,       // 최근 1개월 안에 마삼 4회 → 공황
   panicWaitMonths: 2,  // 마지막 마삼 후 2개월 + 1일
   panicWaitDays: 1,
-  rebaseAfter: '2026-11-25', // 이 날 종가 위치에서 말뚝박기를 새로 시작 (그 전 장중 체결은 반영 안 함)
+  rebaseDates: [],     // 그날 종가에서 다시 시작할 날짜 (docs/data/corrections.json에서 읽음)
   panicAllowsOtherExits: true,  // 공황 대기 중에도 V자 반등/8일 연속 상승이면 전량 매수 (사용자 확정)
 };
 
@@ -53,7 +53,7 @@ export function initialState() {
     anchorZone: 0,         // 1단계 기준 구간 (재진입한 구간; 전고점에서 시작하면 0)
     maxDD: 0,              // 주문 체결 기준 최대 하락률 % (startDate에 현재가로 재설정)
     lowDD: 0,              // 이번 국면 실제 최저 하락률 % (V자 반등 판단용)
-    lastClose: null, rebased: false,
+    lastClose: null,
     upStreak: 0,
     mamsamDates: [],
     lastMamsam: null,      // 가장 최근 마삼 { date, chg }
@@ -70,8 +70,8 @@ export function step(prev, bar, cfg = DEFAULTS) {
   const s = { ...prev, mamsamDates: [...prev.mamsamDates] };
   const before = s.stock;
   const reasons = [], trades = [];
-  const trade = (to, price, why) => {
-    if (to !== s.stock) trades.push({ from: s.stock, to, price, why });
+  const trade = (to, price, why, kind = 'close') => {
+    if (to !== s.stock) trades.push({ from: s.stock, to, price, why, kind });
     s.stock = to; reasons.push(why);
   };
 
@@ -91,13 +91,13 @@ export function step(prev, bar, cfg = DEFAULTS) {
         const st = cfg.stakeStep;
         for (let z = zoneOf(from, st) + 1; z <= zoneOf(lowDD, st); z++) {
           const t = stakeStock(z, cfg);
-          if (t > s.stock) trade(t, priceAt(s.ath, z * st), `말뚝박기 -${z * st}% 도달 → 주식 ${t}%`);
+          if (t > s.stock) trade(t, priceAt(s.ath, z * st), `말뚝박기 -${z * st}% 도달 → 주식 ${t}%`, 'fill');
         }
       } else {
         const st = cfg.rebalStep;
         for (let z = zoneOf(from, st) + 1; z <= zoneOf(lowDD, st); z++) {
           const t = Math.max(0, 100 - cfg.rebalUnit * (z - s.anchorZone));
-          if (t < s.stock) trade(t, priceAt(s.ath, z * st), `현금화 -${(z * st).toFixed(1)}% 도달 → 주식 ${t}%`);
+          if (t < s.stock) trade(t, priceAt(s.ath, z * st), `현금화 -${(z * st).toFixed(1)}% 도달 → 주식 ${t}%`, 'fill');
         }
         s.mode = s.stock < 100 ? 'REBAL' : 'HOLD';
       }
@@ -153,7 +153,7 @@ export function step(prev, bar, cfg = DEFAULTS) {
   }
 
   s.lastClose = bar.close;
-  const delta = s.stock - before;
+  const delta = Math.round((s.stock - before) * 10) / 10;
   return {
     state: s,
     signal: {
@@ -165,21 +165,39 @@ export function step(prev, bar, cfg = DEFAULTS) {
   };
 }
 
+// 그날 종가 위치에서 다시 시작: 그날 장중 체결은 없던 것으로 하고, 종가 위치의 표 비중으로 맞춘 뒤 아래 구간부터 주문
+export function rebase(state, close, cfg = DEFAULTS) {
+  const s = { ...state };
+  if (!s.ath) return s;
+  const dd = Math.max(0, (s.ath - close) / s.ath * 100);
+  s.maxDD = dd;
+  if (s.mode === 'STAKE') s.stock = stakeStock(zoneOf(dd, cfg.stakeStep), cfg);
+  else if (s.mode === 'REBAL') {
+    s.stock = Math.min(100, Math.max(0, 100 - cfg.rebalUnit * (zoneOf(dd, cfg.rebalStep) - s.anchorZone)));
+    if (s.stock >= 100) s.mode = 'HOLD';
+  }
+  return s;
+}
+
+// 다시 시작한 날의 신호는 체결 없이 '종가 위치에서 재시작'으로 표시
+export function markRebased(signal, state, prevSignal) {
+  const before = prevSignal ? prevSignal.stock : 100;
+  signal.rebased = true;
+  signal.trades = [];
+  signal.stock = state.stock; signal.mode = state.mode;
+  signal.delta = 0; signal.action = 'HOLD';
+  signal.reasons = [`체결 못함 → 종가 위치에서 다시 시작 (주식 ${state.stock}%${before !== state.stock ? `, 이전 ${before}%` : ''})`];
+}
+
+// cfg.rebaseDates: '체결 못함' 등으로 그날 종가에서 다시 시작할 날짜들
 export function run(bars, cfg = DEFAULTS) {
   let state = initialState();
   const signals = [];
+  const rebaseDates = new Set(cfg.rebaseDates || []);
   for (const bar of bars) {
     const r = step(state, bar, cfg);
     state = r.state; signals.push(r.signal);
-    // 기준일 종가 위치에서 다시 시작: 말뚝박기 중이면 그 위치의 표 비중으로 맞추고 아래 구간부터 주문
-    if (cfg.rebaseAfter && !state.rebased && bar.date >= cfg.rebaseAfter) {
-      state = { ...state, rebased: true };
-      if (state.mode === 'STAKE') {
-        const dd = (state.ath - bar.close) / state.ath * 100;
-        state.maxDD = dd;
-        state.stock = stakeStock(zoneOf(dd, cfg.stakeStep), cfg);
-      }
-    }
+    if (rebaseDates.has(bar.date)) markRebased(r.signal, state = rebase(state, bar.close, cfg), signals.at(-2));
   }
   return { state, signals, triggers: nextTriggers(state, cfg) };
 }
