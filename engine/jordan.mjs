@@ -16,7 +16,7 @@ export const DEFAULTS = {
   panicCount: 4,       // 최근 1개월 안에 마삼 4회 → 공황
   panicWaitMonths: 2,  // 마지막 마삼 후 2개월 + 1일
   panicWaitDays: 1,
-  rebaseAfter: '2026-11-24', // 이 날 종가 위치에서 말뚝박기를 새로 시작 (그 전 장중 체결은 반영 안 함)
+  rebaseAfter: '2026-11-25', // 이 날 종가 위치에서 말뚝박기를 새로 시작 (그 전 장중 체결은 반영 안 함)
   panicAllowsOtherExits: true,  // 공황 대기 중에도 V자 반등/8일 연속 상승이면 전량 매수 (사용자 확정)
 };
 
